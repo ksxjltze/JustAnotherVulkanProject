@@ -11,21 +11,21 @@
 #include <algorithm>
 #include <fstream>
 
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
+const uint32_t kWidth = 800;
+const uint32_t kHeight = 600;
 
-const std::vector<const char*> validationLayers = {
+const std::vector<const char*> kValidationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
 
-const std::vector<const char*> deviceExtensions = {
+const std::vector<const char*> kDeviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
-const bool enableValidationLayers = true;
+const bool kEnableValidationLayers = true;
 #endif
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
@@ -45,7 +45,7 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
-static std::vector<char> readFile(const std::string& filename) {
+static std::vector<char> ReadFile(const std::string& filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
     if (!file.is_open()) {
@@ -102,6 +102,10 @@ private:
     VkCommandPool command_pool_;
     VkCommandBuffer command_buffer_;
 
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderFinishedSemaphore;
+    VkFence inFlightFence;
+
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -138,26 +142,28 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window_ = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", NULL, NULL);
+        window_ = glfwCreateWindow(kWidth, kHeight, "Vulkan", NULL, NULL);
     }
 
     void initVulkan() {
-        createInstance();
-        setupDebugMessenger();
-        createSurface();
-        pickPhysicalDevice();
-        createLogicalDevice();
-        createSwapChain();
-        createImageViews();
-        createRenderPass();
-        createGraphicsPipeline();
-        createFramebuffers();
-        createCommandPool();
+        CreateInstance();
+        SetupDebugMessenger();
+        CreateSurface();
+        PickPhysicalDevice();
+        CreateLogicalDevice();
+        CreateSwapChain();
+        CreateImageViews();
+        CreateRenderPass();
+        CreateGraphicsPipeline();
+        CreateFramebuffers();
+        CreateCommandPool();
+        CreateSyncObjects();
     }
 
     void mainLoop() {
         while (!glfwWindowShouldClose(window_)) {
             glfwPollEvents();
+            DrawFrame();
         }
     }
 
@@ -180,7 +186,7 @@ private:
         vkDestroyDevice(logical_device_, nullptr);
         vkDestroySurfaceKHR(instance_, surface_, nullptr);
 
-        if (enableValidationLayers) {
+        if (kEnableValidationLayers) {
             DestroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
         }
 
@@ -192,8 +198,8 @@ private:
 
 
     //INSTANCE
-    void createInstance() {
-        if (enableValidationLayers && !checkValidationLayerSupport()) {
+    void CreateInstance() {
+        if (kEnableValidationLayers && !checkValidationLayerSupport()) {
             throw std::runtime_error("validation layers requested, but not available!");
         }
 
@@ -219,9 +225,9 @@ private:
         createInfo.ppEnabledExtensionNames = requiredExtensions.data();
 
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        if (enableValidationLayers) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
+        if (kEnableValidationLayers) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(kValidationLayers.size());
+            createInfo.ppEnabledLayerNames = kValidationLayers.data();
 
             populateDebugMessengerCreateInfo(debugCreateInfo);
             createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
@@ -253,7 +259,7 @@ private:
 
         std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-        if (enableValidationLayers) {
+        if (kEnableValidationLayers) {
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
 
@@ -269,7 +275,7 @@ private:
         std::vector<VkLayerProperties> availableLayers(layerCount);
         vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-        for (const char* layerName : validationLayers) {
+        for (const char* layerName : kValidationLayers) {
             bool layerFound = false;
 
             for (const auto& layerProperties : availableLayers) {
@@ -295,8 +301,8 @@ private:
         createInfo.pfnUserCallback = debugCallback;
     }
 
-    void setupDebugMessenger() {
-        if (!enableValidationLayers) return;
+    void SetupDebugMessenger() {
+        if (!kEnableValidationLayers) return;
 
         VkDebugUtilsMessengerCreateInfoEXT createInfo{};
         populateDebugMessengerCreateInfo(createInfo);
@@ -308,7 +314,7 @@ private:
 
 
     //SURFACE
-    void createSurface() {
+    void CreateSurface() {
         if (glfwCreateWindowSurface(instance_, window_, nullptr, &surface_) != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
@@ -336,7 +342,7 @@ private:
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
-        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+        std::set<std::string> requiredExtensions(kDeviceExtensions.begin(), kDeviceExtensions.end());
 
         for (const auto& extension : availableExtensions) {
             requiredExtensions.erase(extension.extensionName);
@@ -369,7 +375,7 @@ private:
         return score;
     }
 
-    void pickPhysicalDevice() {
+    void PickPhysicalDevice() {
         uint32_t deviceCount = 0;
         vkEnumeratePhysicalDevices(instance_, &deviceCount, nullptr);
 
@@ -451,7 +457,7 @@ private:
     }
 
     //LOGICAL DEVICE
-    void createLogicalDevice() {
+    void CreateLogicalDevice() {
 
         //queue info
         QueueFamilyIndices indices = findQueueFamilies(physical_device_);
@@ -461,8 +467,8 @@ private:
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
         createInfo.pEnabledFeatures = &deviceFeatures;
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-        createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(kDeviceExtensions.size());
+        createInfo.ppEnabledExtensionNames = kDeviceExtensions.data();
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
@@ -482,9 +488,9 @@ private:
 
 
         //debug
-        if (enableValidationLayers) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
+        if (kEnableValidationLayers) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(kValidationLayers.size());
+            createInfo.ppEnabledLayerNames = kValidationLayers.data();
         }
         else {
             createInfo.enabledLayerCount = 0;
@@ -576,7 +582,7 @@ private:
         }
     }
 
-    void createSwapChain() {
+    void CreateSwapChain() {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physical_device_);
 
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -638,7 +644,7 @@ private:
 
 
     //IMAGE VIEWS
-    void createImageViews() {
+    void CreateImageViews() {
         swap_chain_image_views_.resize(swap_chain_images_.size());
 
         for (size_t i = 0; i < swap_chain_images_.size(); i++) {
@@ -667,9 +673,9 @@ private:
     }
 
     //GRAPHICS PIPELINE
-    void createGraphicsPipeline() {
-        auto vertShaderCode = readFile("shaders/vert.spv");
-        auto fragShaderCode = readFile("shaders/frag.spv");
+    void CreateGraphicsPipeline() {
+        auto vertShaderCode = ReadFile("shaders/vert.spv");
+        auto fragShaderCode = ReadFile("shaders/frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -838,7 +844,7 @@ private:
 
 
     //RENDER PASS
-    void createRenderPass() {
+    void CreateRenderPass() {
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swap_chain_image_format_;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -875,7 +881,7 @@ private:
     }
 
     //FRAMEBUFFERS
-    void createFramebuffers() {
+    void CreateFramebuffers() {
         swap_chain_framebuffers_.resize(swap_chain_image_views_.size());
 
         for (size_t i = 0; i < swap_chain_image_views_.size(); i++) {
@@ -900,7 +906,7 @@ private:
 
 
     //COMMAND BUFFERS
-    void createCommandPool() {
+    void CreateCommandPool() {
         QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physical_device_);
 
         VkCommandPoolCreateInfo poolInfo{};
@@ -972,6 +978,14 @@ private:
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
         }
+    }
+
+    void DrawFrame() {
+
+    }
+
+    void CreateSyncObjects() {
+
     }
 };
 
