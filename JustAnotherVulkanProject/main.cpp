@@ -13,6 +13,7 @@
 
 const uint32_t kWidth = 800;
 const uint32_t kHeight = 600;
+const char* kWindowName = "Just Another Vulkan Project";
 const int kMaxFramesInFlight = 2;
 
 const std::vector<const char*> kValidationLayers = {
@@ -108,8 +109,9 @@ private:
     std::vector<VkFence> in_flight_fences_;
 
     uint32_t current_frame_ = 0;
+    bool frame_buffer_resized_ = false;
 
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT messageType,
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -145,7 +147,16 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window_ = glfwCreateWindow(kWidth, kHeight, "Vulkan", NULL, NULL);
+        window_ = glfwCreateWindow(kWidth, kHeight, kWindowName, NULL, NULL);
+        glfwSetWindowUserPointer(window_, this);
+        glfwSetFramebufferSizeCallback(window_, FramebufferResizeCallback);
+    }
+
+    static void FramebufferResizeCallback(GLFWwindow* window, int width, int height) {
+        (width), (height);
+
+        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        app->frame_buffer_resized_ = true;
     }
 
     void InitVulkan() {
@@ -182,19 +193,12 @@ private:
 
         vkDestroyCommandPool(logical_device_, command_pool_, nullptr);
 
-        for (auto framebuffer : swap_chain_framebuffers_) {
-            vkDestroyFramebuffer(logical_device_, framebuffer, nullptr);
-        }
+        CleanupSwapChain();
 
         vkDestroyPipeline(logical_device_, graphics_pipeline_, nullptr);
         vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
         vkDestroyRenderPass(logical_device_, render_pass_, nullptr);
 
-        for (auto imageView : swap_chain_image_views_) {
-            vkDestroyImageView(logical_device_, imageView, nullptr);
-        }
-
-        vkDestroySwapchainKHR(logical_device_, swap_chain_, nullptr);
         vkDestroyDevice(logical_device_, nullptr);
         vkDestroySurfaceKHR(instance_, surface_, nullptr);
 
@@ -310,7 +314,7 @@ private:
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        createInfo.pfnUserCallback = debugCallback;
+        createInfo.pfnUserCallback = DebugCallback;
     }
 
     void SetupDebugMessenger() {
@@ -340,7 +344,7 @@ private:
 
         bool swapChainAdequate = false;
         if (extensionsSupported) {
-            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+            SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(device);
             swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
         }
 
@@ -525,7 +529,7 @@ private:
         std::vector<VkPresentModeKHR> presentModes;
     };
 
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
+    SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device) {
         SwapChainSupportDetails details;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &details.capabilities);
 
@@ -548,7 +552,7 @@ private:
         return details;
     }
 
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+    VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
         for (const auto& availableFormat : availableFormats) {
             if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                 return availableFormat;
@@ -564,7 +568,7 @@ private:
         return availableFormats[0];
     }
 
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
+    VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
         for (const auto& availablePresentMode : availablePresentModes) {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
                 return availablePresentMode;
@@ -574,7 +578,7 @@ private:
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+    VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
         if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
             return capabilities.currentExtent;
         }
@@ -595,11 +599,11 @@ private:
     }
 
     void CreateSwapChain() {
-        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physical_device_);
+        SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(physical_device_);
 
-        VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-        VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-        VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+        VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.formats);
+        VkPresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport.presentModes);
+        VkExtent2D extent = ChooseSwapExtent(swapChainSupport.capabilities);
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
 
@@ -652,6 +656,37 @@ private:
 
         swap_chain_image_format_ = surfaceFormat.format;
         swap_chain_extent_ = extent;
+    }
+
+    void CleanupSwapChain() {
+        for (auto framebuffer : swap_chain_framebuffers_) {
+            vkDestroyFramebuffer(logical_device_, framebuffer, nullptr);
+        }
+
+        for (auto imageView : swap_chain_image_views_) {
+            vkDestroyImageView(logical_device_, imageView, nullptr);
+        }
+
+        vkDestroySwapchainKHR(logical_device_, swap_chain_, nullptr);
+    }
+
+    void RecreateSwapChain() {
+
+        //minimized
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window_, &width, &height);
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(window_, &width, &height);
+            glfwWaitEvents();
+        }
+
+		vkDeviceWaitIdle(logical_device_);
+
+        CleanupSwapChain();
+
+        CreateSwapChain();
+        CreateImageViews();
+        CreateFramebuffers();
     }
 
 
@@ -996,10 +1031,20 @@ private:
 
     void DrawFrame() {
         vkWaitForFences(logical_device_, 1, &in_flight_fences_[current_frame_], VK_TRUE, UINT64_MAX);
-        vkResetFences(logical_device_, 1, &in_flight_fences_[current_frame_]);
 
         uint32_t imageIndex;
-        vkAcquireNextImageKHR(logical_device_, swap_chain_, UINT64_MAX, image_available_semaphores_[current_frame_], VK_NULL_HANDLE, &imageIndex);
+        VkResult nextImageResult = vkAcquireNextImageKHR(logical_device_, swap_chain_, UINT64_MAX, image_available_semaphores_[current_frame_], VK_NULL_HANDLE, &imageIndex);
+
+        if (nextImageResult == VK_ERROR_OUT_OF_DATE_KHR) {
+            RecreateSwapChain();
+            return;
+        }
+        else if (nextImageResult != VK_SUCCESS && nextImageResult != VK_SUBOPTIMAL_KHR) {
+            throw std::runtime_error("failed to acquire swap chain image!");
+        }
+
+        // Only reset the fence if we are submitting work
+        vkResetFences(logical_device_, 1, &in_flight_fences_[current_frame_]);
 
         vkResetCommandBuffer(command_buffers_[current_frame_], 0);
         RecordCommandBuffer(command_buffers_[current_frame_], imageIndex);
@@ -1050,7 +1095,15 @@ private:
         presentInfo.pImageIndices = &imageIndex;
         presentInfo.pResults = nullptr; // Optional
 
-        vkQueuePresentKHR(present_queue_, &presentInfo);
+        VkResult queuePresentResult = vkQueuePresentKHR(present_queue_, &presentInfo);
+
+        if (queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR || queuePresentResult == VK_SUBOPTIMAL_KHR || frame_buffer_resized_) {
+            frame_buffer_resized_ = false;
+            RecreateSwapChain();
+        }
+        else if (queuePresentResult != VK_SUCCESS) {
+            throw std::runtime_error("failed to present swap chain image!");
+        }
 
 		current_frame_ = (current_frame_ + 1) % kMaxFramesInFlight;
     }
