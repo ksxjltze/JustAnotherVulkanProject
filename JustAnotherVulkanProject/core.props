@@ -8,7 +8,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)extern\glfw-3.4.bin.WIN64\glfw-3.4.bin.WIN64\include;$(SolutionDir)extern\VulkanSDK\1.4.304.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)extern\stb\include;$(SolutionDir)extern\glfw-3.4.bin.WIN64\glfw-3.4.bin.WIN64\include;$(SolutionDir)extern\VulkanSDK\1.4.304.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
